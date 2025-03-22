@@ -30,7 +30,7 @@ jobs:
           echo "$PRIVATE_KEY" > private_key.pem && chmod 400 private_key.pem
 
           # Establecer conexión SSH con el servidor remoto
-          ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER_NAME}@${HOST_NAME} "
+          ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i private_key.pem ${USER_NAME}@${HOST_NAME} "
             
             # Verificar si el directorio del proyecto ya tiene un repositorio Git
             if [ ! -d \"${PROJECT_PATH}/.git\" ]; then
