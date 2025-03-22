@@ -1,0 +1,64 @@
+# Nombre del workflow
+name: Deploy
+
+# Definir cuándo se ejecutará el workflow
+on:
+  push:
+    branches: [main]  # Se ejecuta solo cuando hay un push en la rama main
+
+# Definir los trabajos (jobs) que ejecutará el workflow
+jobs:
+  Deploy:  # Nombre del job
+    name: Deploy to Server  # Nombre descriptivo del job
+    runs-on: ubuntu-latest  # Se ejecuta en un entorno de Ubuntu en GitHub Actions
+
+    steps:
+      # Paso 1: Clonar el código fuente en la máquina virtual de GitHub Actions
+      - uses: actions/checkout@v2
+
+      # Paso 2: Configurar y ejecutar el despliegue
+      - name: Build & Deploy
+        env:
+          PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}  # Llave privada SSH para conectarse al servidor
+          HOST_NAME: ${{ secrets.SSH_HOST }}  # Dirección IP o dominio del servidor
+          USER_NAME: ${{ secrets.USER_NAME }}  # Usuario con permisos en el servidor
+          PROJECT_PATH: ${{ secrets.PROJECT_PATH }}  # Ruta donde se alojará el proyecto en el servidor
+          GIT_REPO: ${{ secrets.GIT_REPO }}  # URL del repositorio del código fuente
+
+        run: |
+          # Crear un archivo para almacenar la llave privada y asignar los permisos correctos
+          echo "$PRIVATE_KEY" > private_key.pem && chmod 400 private_key.pem
+
+          # Establecer conexión SSH con el servidor remoto
+          ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER_NAME}@${HOST_NAME} "
+            
+            # Verificar si el directorio del proyecto ya tiene un repositorio Git
+            if [ ! -d \"${PROJECT_PATH}/.git\" ]; then
+              # Si no existe, crear la carpeta base del proyecto
+              mkdir -p \$(dirname ${PROJECT_PATH})
+
+              # Clonar el repositorio en la ubicación especificada
+              git clone ${GIT_REPO} ${PROJECT_PATH}
+            fi
+
+            # Acceder al directorio del proyecto
+            cd ${PROJECT_PATH} &&
+
+            # Asegurarse de estar en la rama main
+            git checkout main &&
+
+            # Obtener todas las referencias remotas
+            git fetch --all &&
+
+            # Restablecer el estado del repositorio para que coincida exactamente con la versión remota
+            git reset --hard origin/main &&
+
+            # Descargar los últimos cambios del repositorio
+            git pull origin main &&
+
+            # Construir los contenedores con Docker Compose
+            docker compose build &&
+
+            # Levantar los contenedores en segundo plano
+            docker compose up -d
+          "
